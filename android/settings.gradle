@@ -1,0 +1,5 @@
+rootProject.name = 'guru_sdk'
+
+
+include ':sdk'
+project(':sdk').projectDir = file('../android/guru-android-sdk/guru-android-sdk')

@@ -27,4 +27,12 @@ abstract class GuruSdkPlatform extends PlatformInterface {
   Future<void> createGuruVideoJob(
       String domain, String activity, String apiKey);
   Future<FrameInference> newFrame(dynamic frame);
+  Future<void> cancelVideoJob();
+
+  Function? downloadStarted;
+  Function? downloadFinished;
+
+  Future<bool> doesModelNeedToBeDownloaded(String apiKey);
+
+  Future<void> downloadModel(String apiKey);
 }

@@ -49,7 +49,7 @@ class GuruSdkPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, Coroutine
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "guru_sdk")
         channel.setMethodCallHandler(this)
         context = flutterPluginBinding.applicationContext
-
+        loadGuruJob = Job()
     }
 
     @RequiresApi(Build.VERSION_CODES.KITKAT)
@@ -60,7 +60,6 @@ class GuruSdkPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, Coroutine
             }
             "createGuruVideoJob" -> {
                 val args = call.arguments as ArrayList<String>
-                loadGuruJob = Job()
                 launch(loadGuruJob) {
                     guruVideo = GuruVideoImpl.create(
                         args[0],
@@ -81,9 +80,37 @@ class GuruSdkPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, Coroutine
                     args[4] as Int,
                     args[5] as Int
                 )
-                launch(Dispatchers.IO) {
+                launch(coroutineContext) {
                     val inference = guruVideo!!.newFrame(bitmap)
                     result.success(inferenceToJSON(inference))
+                }
+            }
+            "cancelVideoJob" -> {
+                loadGuruJob.cancel()
+                result.success(null)
+            }
+            "downloadModel" -> {
+                val store = ModelStore(call.arguments as String, context)
+                store.startedDownloadCallback = {
+                    activity.runOnUiThread {
+                        channel.invokeMethod("downloadStarted", null)
+                    }
+                }
+                store.finishedDownloadCallback = {
+                    activity.runOnUiThread {
+                        channel.invokeMethod("downloadFinished", null)
+                    }
+                }
+                launch(coroutineContext) {
+                    store.fetchModel()
+                }
+                result.success(null)
+            }
+            "doesModelNeedToBeDownloaded" -> {
+                val store = ModelStore(call.arguments as String, context)
+                launch(coroutineContext) {
+                    val res = store.doesModelNeedDownloading()
+                    result.success(res)
                 }
 
 

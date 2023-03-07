@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'guru_sdk_platform_interface.dart';
 
 class GuruSdk {
+  static bool useSmoothedKeyPoints = false;
+
   Future<void> createGuruVideoJob(
       String domain, String activity, String apiKey) {
     return GuruSdkPlatform.instance
@@ -11,6 +13,34 @@ class GuruSdk {
 
   Future<FrameInference> newFrame(dynamic frame) async {
     return GuruSdkPlatform.instance.newFrame(frame);
+  }
+
+  Future<void> cancelVideoJob() {
+    return GuruSdkPlatform.instance.cancelVideoJob();
+  }
+
+  Function? get downloadStarted {
+    return GuruSdkPlatform.instance.downloadStarted;
+  }
+
+  set downloadStarted(val) {
+    GuruSdkPlatform.instance.downloadStarted = val;
+  }
+
+  Function? get downloadFinished {
+    return GuruSdkPlatform.instance.downloadFinished;
+  }
+
+  set downloadFinished(val) {
+    GuruSdkPlatform.instance.downloadFinished = val;
+  }
+
+  Future<bool> doesModelNeedToBeDownloaded(String apiKey) {
+    return GuruSdkPlatform.instance.doesModelNeedToBeDownloaded(apiKey);
+  }
+
+  Future<void> downloadModel(String apiKey) {
+    return GuruSdkPlatform.instance.downloadModel(apiKey);
   }
 }
 
@@ -53,6 +83,57 @@ class FrameInference {
     data['smoothKeypoints'] = smoothKeypoints.map((e) => e.toJson()).toList();
     data['previousFrame'] = previousFrame?.toJson();
     return data;
+  }
+
+  final cocoKeypoints = [
+    "nose",
+    "left_eye",
+    "right_eye",
+    "left_ear",
+    "right_ear",
+    "left_shoulder",
+    "right_shoulder",
+    "left_elbow",
+    "right_elbow",
+    "left_wrist",
+    "right_wrist",
+    "left_hip",
+    "right_hip",
+    "left_knee",
+    "right_knee",
+    "left_ankle",
+    "right_ankle",
+  ];
+
+  final cocoPairs = [
+    ["left_shoulder", "right_shoulder"],
+    ["left_shoulder", "left_hip"],
+    ["left_hip", "left_knee"],
+    ["left_knee", "left_ankle"],
+    ["right_shoulder", "right_hip"],
+    ["right_hip", "right_knee"],
+    ["right_knee", "right_ankle"],
+    ["left_hip", "right_hip"],
+    ["left_shoulder", "left_elbow"],
+    ["left_elbow", "left_wrist"],
+    ["right_shoulder", "right_elbow"],
+    ["right_elbow", "right_wrist"],
+  ];
+
+  int cocoLabelToIdx(String label) {
+    return cocoKeypoints.indexOf(label);
+  }
+
+  KeyPoint? keypointForLandmark(InferenceLandmark landmark) {
+    return GuruSdk.useSmoothedKeyPoints
+        ? smoothKeypoints.isEmpty
+            ? null
+            : smoothKeypoints[
+                cocoLabelToIdx(landmark.label).clamp(0, smoothKeypoints.length)]
+        : keypoints.isEmpty
+            ? null
+            : keypoints[
+                cocoLabelToIdx(landmark.label).clamp(0, keypoints.length)];
   }
 }
 
@@ -129,6 +210,50 @@ class Reps {
     data['analyses'] = analyses;
     return data;
   }
+}
+
+enum InferenceLandmark {
+  leftEye,
+  rightEye,
+  leftEar,
+  rightEar,
+  nose,
+  leftShoulder,
+  rightShoulder,
+  leftElbow,
+  rightElbow,
+  leftWrist,
+  rightWrist,
+  leftHip,
+  rightHip,
+  leftKnee,
+  rightKnee,
+  leftAnkle,
+  rightAnkle,
+}
+
+extension InferenceLandmarkExt on InferenceLandmark {
+  static const labels = {
+    InferenceLandmark.leftEye: "left_eye",
+    InferenceLandmark.rightEye: "right_eye",
+    InferenceLandmark.leftEar: "left_ear",
+    InferenceLandmark.rightEar: "right_ear",
+    InferenceLandmark.nose: "nose",
+    InferenceLandmark.leftShoulder: "left_shoulder",
+    InferenceLandmark.rightShoulder: "right_shoulder",
+    InferenceLandmark.leftElbow: "left_elbow",
+    InferenceLandmark.rightElbow: "right_elbow",
+    InferenceLandmark.leftWrist: "left_wrist",
+    InferenceLandmark.rightWrist: "right_wrist",
+    InferenceLandmark.leftHip: "left_hip",
+    InferenceLandmark.rightHip: "right_hip",
+    InferenceLandmark.leftKnee: "left_knee",
+    InferenceLandmark.rightKnee: "right_knee",
+    InferenceLandmark.leftAnkle: "left_ankle",
+    InferenceLandmark.rightAnkle: "right_ankle",
+  };
+
+  String get label => labels[this]!;
 }
 
 // class Analyses {

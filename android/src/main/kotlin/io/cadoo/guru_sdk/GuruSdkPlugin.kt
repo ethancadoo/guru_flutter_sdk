@@ -39,7 +39,7 @@ class GuruSdkPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, Coroutine
     }
 
 
-    private lateinit var loadGuruJob: Job
+    private val loadGuruJob: Job = Job()
 
     override val coroutineContext
         get() = Dispatchers.IO + loadGuruJob
@@ -49,7 +49,6 @@ class GuruSdkPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, Coroutine
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "guru_sdk")
         channel.setMethodCallHandler(this)
         context = flutterPluginBinding.applicationContext
-        loadGuruJob = Job()
     }
 
     @RequiresApi(Build.VERSION_CODES.KITKAT)

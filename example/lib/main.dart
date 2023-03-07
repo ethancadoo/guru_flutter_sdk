@@ -25,6 +25,27 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Guru Flutter SDK'),
+        ),
+        body: const HomePage(),
+      ),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
   bool jobInProgress = false;
   String selectedWorkout = 'push_up';
 
@@ -33,21 +54,45 @@ class _MyAppState extends State<MyApp> {
 
   FrameInference? lastFrameInference;
 
+  bool downloadNeeded = false;
+  bool downloadInProgress = false;
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
 
     _guruSdkPlugin.downloadStarted = () {
-      print('Dart download started');
+      setState(() {
+        downloadInProgress = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Download started'),
+      ));
     };
     _guruSdkPlugin.downloadFinished = () {
-      print('Dart download finished');
+      setState(() {
+        downloadInProgress = false;
+        downloadNeeded = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Download finished'),
+      ));
     };
 
     _guruSdkPlugin.doesModelNeedToBeDownloaded(API_KEY).then((value) {
-      print('Model does need to be downloaded: $value');
       if (value) {
-        _guruSdkPlugin.downloadModel(API_KEY);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Model download needed'),
+        ));
+        setState(() {
+          downloadNeeded = true;
+        });
       }
     });
 
@@ -93,84 +138,77 @@ class _MyAppState extends State<MyApp> {
   }
 
   @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Guru Flutter SDK'),
-        ),
-        body: SingleChildScrollView(
-          child: Column(
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          CameraPreview(
+            controller,
+            child: CustomPaint(
+              size: controller.value.previewSize != null
+                  ? controller.value.previewSize!
+                  : Size.zero,
+              painter: JointOverlay(inference: lastFrameInference),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (downloadNeeded && !downloadInProgress)
+            ElevatedButton(
+                onPressed: () => _guruSdkPlugin.downloadModel(API_KEY),
+                child: const Text('Download Model')),
+          if (downloadInProgress) const CircularProgressIndicator(),
+          Center(
+            child: Text(
+              lastFrameInference != null
+                  ? '${lastFrameInference!.analysis.movement}  ${lastFrameInference!.analysis.reps.length}'
+                  : 'null',
+              style: const TextStyle(fontSize: 30),
+            ),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              CameraPreview(
-                controller,
-                child: CustomPaint(
-                  size: controller.value.previewSize != null
-                      ? controller.value.previewSize!
-                      : Size.zero,
-                  painter: JointOverlay(inference: lastFrameInference),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Center(
-                child: Text(
-                  lastFrameInference != null
-                      ? '${lastFrameInference!.analysis.movement}  ${lastFrameInference!.analysis.reps.length}'
-                      : 'null',
-                  style: const TextStyle(fontSize: 30),
-                ),
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  const Text('Use smoothed keypoints'),
-                  Switch(
-                      value: GuruSdk.useSmoothedKeyPoints,
-                      onChanged: (val) => setState(() {
-                            GuruSdk.useSmoothedKeyPoints = val;
-                          })),
-                ],
-              ),
-              ElevatedButton(
-                  onPressed: () async {
-                    if (jobInProgress) {
-                      setState(() {
-                        jobInProgress = false;
-                      });
-                      await _guruSdkPlugin.cancelVideoJob();
-                    } else {
-                      await _guruSdkPlugin.createGuruVideoJob(
-                          'calisthenics', selectedWorkout, API_KEY);
-                      setState(() {
-                        jobInProgress = true;
-                      });
-                    }
-                  },
-                  child:
-                      Text(jobInProgress ? 'Stop Guru Job' : 'Start guru job')),
-              DropdownButton<String>(
-                  value: selectedWorkout,
-                  onChanged: (val) => setState(() => selectedWorkout = val!),
-                  items: const [
-                    DropdownMenuItem<String>(
-                      value: 'push_up',
-                      child: Text('Pushups'),
-                    ),
-                    DropdownMenuItem<String>(
-                        value: 'bodyweight_squat',
-                        child: Text('Body Weight Squat')),
-                  ]),
-              const SizedBox(height: 10),
+              const Text('Use smoothed keypoints'),
+              Switch(
+                  value: GuruSdk.useSmoothedKeyPoints,
+                  onChanged: (val) => setState(() {
+                        GuruSdk.useSmoothedKeyPoints = val;
+                      })),
             ],
           ),
-        ),
+          ElevatedButton(
+              onPressed: downloadNeeded
+                  ? null
+                  : () async {
+                      if (jobInProgress) {
+                        setState(() {
+                          jobInProgress = false;
+                        });
+                        await _guruSdkPlugin.cancelVideoJob();
+                      } else {
+                        await _guruSdkPlugin.createGuruVideoJob(
+                            'calisthenics', selectedWorkout, API_KEY);
+                        setState(() {
+                          jobInProgress = true;
+                        });
+                      }
+                    },
+              child: Text(jobInProgress ? 'Stop Guru Job' : 'Start guru job')),
+          DropdownButton<String>(
+              value: selectedWorkout,
+              onChanged: (val) => setState(() => selectedWorkout = val!),
+              items: const [
+                DropdownMenuItem<String>(
+                  value: 'push_up',
+                  child: Text('Pushups'),
+                ),
+                DropdownMenuItem<String>(
+                    value: 'bodyweight_squat',
+                    child: Text('Body Weight Squat')),
+              ]),
+          const SizedBox(height: 10),
+        ],
       ),
     );
   }
